@@ -30,7 +30,7 @@
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 // protoc-gen-go is a plugin for the Google protocol buffer compiler to generate
-// Go code.  Run it by building this program and putting it in your path with
+// Go code. Run it by building this program and putting it in your path with
 // the name
 // 	protoc-gen-go
 // That word 'go' at the end becomes part of the option string set for the
