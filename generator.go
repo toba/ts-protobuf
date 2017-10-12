@@ -304,34 +304,18 @@ func (g *Generator) CommandLineParameters(parameter string) {
 	}
 
 	g.ImportMap = make(map[string]string)
-	pluginList := "none" // Default list of plugin names to enable (empty means all).
+
 	for k, v := range g.Param {
 		switch k {
 		case "import_prefix":
 			g.ImportPrefix = v
 		case "import_path":
 			g.PackageImportPath = v
-		case "plugins":
-			pluginList = v
 		default:
 			if len(k) > 0 && k[0] == 'M' {
 				g.ImportMap[k[1:]] = v
 			}
 		}
-	}
-	if pluginList != "" {
-		// Amend the set of plugins.
-		enabled := make(map[string]bool)
-		for _, name := range strings.Split(pluginList, "+") {
-			enabled[name] = true
-		}
-		var nplugins []Plugin
-		for _, p := range plugins {
-			if enabled[p.Name()] {
-				nplugins = append(nplugins, p)
-			}
-		}
-		plugins = nplugins
 	}
 }
 
@@ -372,36 +356,29 @@ func RegisterUniquePackageName(pkg string, f *FileDescriptor) string {
 	return pkg
 }
 
-var isGoKeyword = map[string]bool{
-	"break":       true,
-	"case":        true,
-	"chan":        true,
-	"const":       true,
-	"continue":    true,
-	"default":     true,
-	"else":        true,
-	"defer":       true,
-	"fallthrough": true,
-	"for":         true,
-	"func":        true,
-	"go":          true,
-	"goto":        true,
-	"if":          true,
-	"import":      true,
-	"interface":   true,
-	"map":         true,
-	"package":     true,
-	"range":       true,
-	"return":      true,
-	"select":      true,
-	"struct":      true,
-	"switch":      true,
-	"type":        true,
-	"var":         true,
+var isTypeScriptKeyword = map[string]bool{
+	"break":     true,
+	"case":      true,
+	"const":     true,
+	"continue":  true,
+	"default":   true,
+	"else":      true,
+	"for":       true,
+	"function":  true,
+	"goto":      true,
+	"if":        true,
+	"import":    true,
+	"interface": true,
+	"map":       true,
+	"return":    true,
+	"select":    true,
+	"switch":    true,
+	"type":      true,
+	"var":       true,
 }
 
-// defaultGoPackage returns the package name to use,
-// derived from the import path of the package we're building code for.
+// defaultGoPackage returns the package name to use, derived from the import
+// path of the package we're building code for.
 func (g *Generator) defaultGoPackage() string {
 	p := g.PackageImportPath
 	if i := strings.LastIndex(p, "/"); i >= 0 {
@@ -413,7 +390,7 @@ func (g *Generator) defaultGoPackage() string {
 
 	p = strings.Map(badToUnderscore, p)
 	// Identifier must not be keyword: insert _.
-	if isGoKeyword[p] {
+	if isTypeScriptKeyword[p] {
 		p = "_" + p
 	}
 	// Identifier must not begin with digit: insert _.
@@ -563,94 +540,6 @@ func (g *Generator) buildNestedEnums(descs []*Descriptor, enums []*EnumDescripto
 			}
 		}
 	}
-}
-
-// Construct the Descriptor
-func newDescriptor(desc *descriptor.DescriptorProto, parent *Descriptor, file *descriptor.FileDescriptorProto, index int) *Descriptor {
-	d := &Descriptor{
-		common:          common{file},
-		DescriptorProto: desc,
-		parent:          parent,
-		index:           index,
-	}
-	if parent == nil {
-		d.path = fmt.Sprintf("%d,%d", messagePath, index)
-	} else {
-		d.path = fmt.Sprintf("%s,%d,%d", parent.path, messageMessagePath, index)
-	}
-
-	// The only way to distinguish a group from a message is whether
-	// the containing message has a TYPE_GROUP field that matches.
-	if parent != nil {
-		parts := d.TypeName()
-		if file.Package != nil {
-			parts = append([]string{*file.Package}, parts...)
-		}
-		exp := "." + strings.Join(parts, ".")
-		for _, field := range parent.Field {
-			if field.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP && field.GetTypeName() == exp {
-				d.group = true
-				break
-			}
-		}
-	}
-
-	for _, field := range desc.Extension {
-		d.ext = append(d.ext, &ExtensionDescriptor{common{file}, field, d})
-	}
-
-	return d
-}
-
-// Return a slice of all the Descriptors defined within this file
-func wrapDescriptors(file *descriptor.FileDescriptorProto) []*Descriptor {
-	sl := make([]*Descriptor, 0, len(file.MessageType)+10)
-	for i, desc := range file.MessageType {
-		sl = wrapThisDescriptor(sl, desc, nil, file, i)
-	}
-	return sl
-}
-
-// Wrap this Descriptor, recursively
-func wrapThisDescriptor(sl []*Descriptor, desc *descriptor.DescriptorProto, parent *Descriptor, file *descriptor.FileDescriptorProto, index int) []*Descriptor {
-	sl = append(sl, newDescriptor(desc, parent, file, index))
-	me := sl[len(sl)-1]
-	for i, nested := range desc.NestedType {
-		sl = wrapThisDescriptor(sl, nested, me, file, i)
-	}
-	return sl
-}
-
-// Construct the EnumDescriptor
-func newEnumDescriptor(desc *descriptor.EnumDescriptorProto, parent *Descriptor, file *descriptor.FileDescriptorProto, index int) *EnumDescriptor {
-	ed := &EnumDescriptor{
-		common:              common{file},
-		EnumDescriptorProto: desc,
-		parent:              parent,
-		index:               index,
-	}
-	if parent == nil {
-		ed.path = fmt.Sprintf("%d,%d", enumPath, index)
-	} else {
-		ed.path = fmt.Sprintf("%s,%d,%d", parent.path, messageEnumPath, index)
-	}
-	return ed
-}
-
-// Return a slice of all the EnumDescriptors defined within this file
-func wrapEnumDescriptors(file *descriptor.FileDescriptorProto, descs []*Descriptor) []*EnumDescriptor {
-	sl := make([]*EnumDescriptor, 0, len(file.EnumType)+10)
-	// Top-level enums.
-	for i, enum := range file.EnumType {
-		sl = append(sl, newEnumDescriptor(enum, nil, file, i))
-	}
-	// Enums within messages. Enums within embedded messages appear in the outer-most message.
-	for _, nested := range descs {
-		for i, enum := range nested.EnumType {
-			sl = append(sl, newEnumDescriptor(enum, nested, file, i))
-		}
-	}
-	return sl
 }
 
 // Return a slice of all the top-level ExtensionDescriptors defined within this file.
@@ -815,10 +704,6 @@ func (g *Generator) Out() {
 
 // GenerateAllFiles generates the output for all the files we're outputting.
 func (g *Generator) GenerateAllFiles() {
-	// Initialize the plugins
-	for _, p := range plugins {
-		p.Init(g)
-	}
 	// Generate the output. The generator runs for every file, even the files
 	// that we don't generate output for, so that we can collate the full list
 	// of exported symbols to support public imports.
@@ -837,13 +722,6 @@ func (g *Generator) GenerateAllFiles() {
 			Name:    proto.String(file.goFileName()),
 			Content: proto.String(g.String()),
 		})
-	}
-}
-
-// Run all the plugins associated with the file.
-func (g *Generator) runPlugins(file *FileDescriptor) {
-	for _, p := range plugins {
-		p.Generate(file)
 	}
 }
 
@@ -870,7 +748,6 @@ func (g *Generator) generate(file *FileDescriptor) {
 		g.P("// is compatible with the proto package it is being compiled against.")
 		g.P("// A compilation error at this line likely means your copy of the")
 		g.P("// proto package needs to be updated.")
-		g.P("const _ = ", g.Pkg["proto"], ".ProtoPackageIsVersion", generatedCodeVersion, " // please upgrade the proto package")
 		g.P()
 	}
 	for _, td := range g.file.imp {
@@ -890,9 +767,6 @@ func (g *Generator) generate(file *FileDescriptor) {
 		g.generateExtension(ext)
 	}
 	g.generateInitFunction()
-
-	// Run the plugins before the imports so we know which imports are necessary.
-	g.runPlugins(file)
 
 	g.generateFileDescriptor(file)
 
@@ -1043,11 +917,6 @@ func (g *Generator) generateImports() {
 		g.P("import ", pname, " ", strconv.Quote(importPath))
 	}
 	g.P()
-	// TODO: may need to worry about uniqueness across plugins
-	for _, p := range plugins {
-		p.GenerateImports(g.file)
-		g.P()
-	}
 	g.P("// Reference imports to suppress errors if they are not otherwise used.")
 	g.P("var _ = ", g.Pkg["proto"], ".Marshal")
 	g.P("var _ = ", g.Pkg["fmt"], ".Errorf")
@@ -2201,67 +2070,6 @@ func (g *Generator) generateMessage(message *Descriptor) {
 	g.addInitf("%s.RegisterType((*%s)(nil), %q)", g.Pkg["proto"], ccTypeName, fullName)
 }
 
-var escapeChars = [256]byte{
-	'a': '\a', 'b': '\b', 'f': '\f', 'n': '\n', 'r': '\r', 't': '\t', 'v': '\v', '\\': '\\', '"': '"', '\'': '\'', '?': '?',
-}
-
-// unescape reverses the "C" escaping that protoc does for default values of bytes fields.
-// It is best effort in that it effectively ignores malformed input. Seemingly invalid escape
-// sequences are conveyed, unmodified, into the decoded result.
-func unescape(s string) string {
-	// NB: Sadly, we can't use strconv.Unquote because protoc will escape both
-	// single and double quotes, but strconv.Unquote only allows one or the
-	// other (based on actual surrounding quotes of its input argument).
-
-	var out []byte
-	for len(s) > 0 {
-		// regular character, or too short to be valid escape
-		if s[0] != '\\' || len(s) < 2 {
-			out = append(out, s[0])
-			s = s[1:]
-		} else if c := escapeChars[s[1]]; c != 0 {
-			// escape sequence
-			out = append(out, c)
-			s = s[2:]
-		} else if s[1] == 'x' || s[1] == 'X' {
-			// hex escape, e.g. "\x80
-			if len(s) < 4 {
-				// too short to be valid
-				out = append(out, s[:2]...)
-				s = s[2:]
-				continue
-			}
-			v, err := strconv.ParseUint(s[2:4], 16, 8)
-			if err != nil {
-				out = append(out, s[:4]...)
-			} else {
-				out = append(out, byte(v))
-			}
-			s = s[4:]
-		} else if '0' <= s[1] && s[1] <= '7' {
-			// octal escape, can vary from 1 to 3 octal digits; e.g., "\0" "\40" or "\164"
-			// so consume up to 2 more bytes or up to end-of-string
-			n := len(s[1:]) - len(strings.TrimLeft(s[1:], "01234567"))
-			if n > 3 {
-				n = 3
-			}
-			v, err := strconv.ParseUint(s[1:1+n], 8, 8)
-			if err != nil {
-				out = append(out, s[:1+n]...)
-			} else {
-				out = append(out, byte(v))
-			}
-			s = s[1+n:]
-		} else {
-			// bad escape, just propagate the slash as-is
-			out = append(out, s[0])
-			s = s[1:]
-		}
-	}
-
-	return string(out)
-}
-
 func (g *Generator) generateExtension(ext *ExtensionDescriptor) {
 	ccTypeName := ext.DescName()
 
@@ -2404,136 +2212,6 @@ func (g *Generator) generateEnumRegistration(enum *EnumDescriptor) {
 
 func (g *Generator) generateExtensionRegistration(ext *ExtensionDescriptor) {
 	g.addInitf("%s.RegisterExtension(%s)", g.Pkg["proto"], ext.DescName())
-}
-
-// And now lots of helper functions.
-
-// Is c an ASCII lower-case letter?
-func isASCIILower(c byte) bool {
-	return 'a' <= c && c <= 'z'
-}
-
-// Is c an ASCII digit?
-func isASCIIDigit(c byte) bool {
-	return '0' <= c && c <= '9'
-}
-
-// CamelCase returns the CamelCased name.
-// If there is an interior underscore followed by a lower case letter,
-// drop the underscore and convert the letter to upper case.
-// There is a remote possibility of this rewrite causing a name collision,
-// but it's so remote we're prepared to pretend it's nonexistent - since the
-// C++ generator lowercases names, it's extremely unlikely to have two fields
-// with different capitalizations.
-// In short, _my_field_name_2 becomes XMyFieldName_2.
-func CamelCase(s string) string {
-	if s == "" {
-		return ""
-	}
-	t := make([]byte, 0, 32)
-	i := 0
-	if s[0] == '_' {
-		// Need a capital letter; drop the '_'.
-		t = append(t, 'X')
-		i++
-	}
-	// Invariant: if the next letter is lower case, it must be converted
-	// to upper case.
-	// That is, we process a word at a time, where words are marked by _ or
-	// upper case letter. Digits are treated as words.
-	for ; i < len(s); i++ {
-		c := s[i]
-		if c == '_' && i+1 < len(s) && isASCIILower(s[i+1]) {
-			continue // Skip the underscore in s.
-		}
-		if isASCIIDigit(c) {
-			t = append(t, c)
-			continue
-		}
-		// Assume we have a letter now - if not, it's a bogus identifier.
-		// The next word is a sequence of characters that must start upper case.
-		if isASCIILower(c) {
-			c ^= ' ' // Make it a capital letter.
-		}
-		t = append(t, c) // Guaranteed not lower case.
-		// Accept lower case sequence that follows.
-		for i+1 < len(s) && isASCIILower(s[i+1]) {
-			i++
-			t = append(t, s[i])
-		}
-	}
-	return string(t)
-}
-
-// CamelCaseSlice is like CamelCase, but the argument is a slice of strings to
-// be joined with "_".
-func CamelCaseSlice(elem []string) string { return CamelCase(strings.Join(elem, "_")) }
-
-// dottedSlice turns a sliced name into a dotted name.
-func dottedSlice(elem []string) string { return strings.Join(elem, ".") }
-
-// Is this field optional?
-func isOptional(field *descriptor.FieldDescriptorProto) bool {
-	return field.Label != nil && *field.Label == descriptor.FieldDescriptorProto_LABEL_OPTIONAL
-}
-
-// Is this field required?
-func isRequired(field *descriptor.FieldDescriptorProto) bool {
-	return field.Label != nil && *field.Label == descriptor.FieldDescriptorProto_LABEL_REQUIRED
-}
-
-// Is this field repeated?
-func isRepeated(field *descriptor.FieldDescriptorProto) bool {
-	return field.Label != nil && *field.Label == descriptor.FieldDescriptorProto_LABEL_REPEATED
-}
-
-// Is this field a scalar numeric type?
-func isScalar(field *descriptor.FieldDescriptorProto) bool {
-	if field.Type == nil {
-		return false
-	}
-	switch *field.Type {
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE,
-		descriptor.FieldDescriptorProto_TYPE_FLOAT,
-		descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_UINT64,
-		descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_FIXED64,
-		descriptor.FieldDescriptorProto_TYPE_FIXED32,
-		descriptor.FieldDescriptorProto_TYPE_BOOL,
-		descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_ENUM,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED32,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED64,
-		descriptor.FieldDescriptorProto_TYPE_SINT32,
-		descriptor.FieldDescriptorProto_TYPE_SINT64:
-		return true
-	default:
-		return false
-	}
-}
-
-// badToUnderscore is the mapping function used to generate Go names from package names,
-// which can be dotted in the input .proto file.  It replaces non-identifier characters such as
-// dot or dash with underscore.
-func badToUnderscore(r rune) rune {
-	if unicode.IsLetter(r) || unicode.IsDigit(r) || r == '_' {
-		return r
-	}
-	return '_'
-}
-
-// baseName returns the last path element of the name, with the last dotted suffix removed.
-func baseName(name string) string {
-	// First, find the last element
-	if i := strings.LastIndex(name, "/"); i >= 0 {
-		name = name[i+1:]
-	}
-	// Now drop the suffix
-	if i := strings.LastIndex(name, "."); i >= 0 {
-		name = name[0:i]
-	}
-	return name
 }
 
 // The SourceCodeInfo message describes the location of elements of a parsed
