@@ -1,29 +1,30 @@
-package main
+package descriptor
 
 import (
 	"fmt"
 	"path"
 	"strings"
 
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"github.com/toba/ts-protobuf/symbol"
 )
 
 // FileDescriptor describes a protocol buffer descriptor file (.proto). It
 // includes slices of all the messages and enums defined within it. Those slices
 // are constructed by WrapTypes.
 type FileDescriptor struct {
-	*descriptor.FileDescriptorProto
+	*proto.FileDescriptorProto
 	desc []*Descriptor          // All the messages defined in this file.
 	enum []*EnumDescriptor      // All the enums defined in this file.
 	ext  []*ExtensionDescriptor // All the top-level extensions defined in this file.
 	imp  []*ImportedDescriptor  // All types defined in files publicly imported by this file.
 
 	// Comments, stored as a map of path (comma-separated integers) to the comment.
-	comments map[string]*descriptor.SourceCodeInfo_Location
+	comments map[string]*proto.SourceCodeInfo_Location
 
 	// The full list of symbols that are exported, as a map from the exported
 	// object to its symbols. This is used for supporting public imports.
-	exported map[Object][]symbol
+	exported map[Object][]symbol.Symbol
 
 	index  int  // The index of this file in the list of files to generate code for
 	proto3 bool // whether to generate proto3 code for this file

@@ -1,10 +1,10 @@
-package main
+package descriptor
 
 import (
 	"fmt"
 	"log"
 
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // EnumDescriptor describes an enum. If it's at top level, its parent will be
@@ -12,7 +12,7 @@ import (
 // defined.
 type EnumDescriptor struct {
 	common
-	*descriptor.EnumDescriptorProto
+	*proto.EnumDescriptorProto
 	parent   *Descriptor // The containing message, if any.
 	typename []string    // Cached typename vector.
 	index    int         // The index into the container, whether the file or a message.
@@ -20,7 +20,7 @@ type EnumDescriptor struct {
 }
 
 // Construct the EnumDescriptor
-func newEnumDescriptor(desc *descriptor.EnumDescriptorProto, parent *Descriptor, file *descriptor.FileDescriptorProto, index int) *EnumDescriptor {
+func newEnumDescriptor(desc *proto.EnumDescriptorProto, parent *Descriptor, file *proto.FileDescriptorProto, index int) *EnumDescriptor {
 	ed := &EnumDescriptor{
 		common:              common{file},
 		EnumDescriptorProto: desc,
@@ -36,7 +36,7 @@ func newEnumDescriptor(desc *descriptor.EnumDescriptorProto, parent *Descriptor,
 }
 
 // Return a slice of all the EnumDescriptors defined within this file
-func wrapEnumDescriptors(file *descriptor.FileDescriptorProto, descs []*Descriptor) []*EnumDescriptor {
+func wrapEnumDescriptors(file *proto.FileDescriptorProto, descs []*Descriptor) []*EnumDescriptor {
 	sl := make([]*EnumDescriptor, 0, len(file.EnumType)+10)
 	// Top-level enums.
 	for i, enum := range file.EnumType {

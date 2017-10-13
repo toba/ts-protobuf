@@ -29,17 +29,17 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-// protoc-gen-go is a plugin for the Google protocol buffer compiler to generate
+// protoc-gen-ts is a plugin for the Google protocol buffer compiler to generate
 // Go code.  Run it by building this program and putting it in your path with
 // the name
-// 	protoc-gen-go
-// That word 'go' at the end becomes part of the option string set for the
+// 	protoc-gen-ts
+// That word 'ts' at the end becomes part of the option string set for the
 // protocol compiler, so once the protocol compiler (protoc) is installed
 // you can run
-// 	protoc --go_out=output_directory input_directory/file.proto
-// to generate Go bindings for the protocol defined by file.proto.
+// 	protoc --ts_out=output_directory input_directory/file.proto
+// to generate TypeScript bindings for the protocol defined by file.proto.
 // With that input, the output will be written to
-// 	output_directory/file.pb.go
+// 	output_directory/file.pb.ts
 //
 // The generated code is documented in the package comment for
 // the library.

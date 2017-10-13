@@ -1,4 +1,4 @@
-package main
+package descriptor
 
 // ImportedDescriptor describes a type that has been publicly imported from
 // another file.

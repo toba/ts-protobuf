@@ -1,9 +1,9 @@
-package main
+package descriptor
 
 import (
 	"strings"
 
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // ExtensionDescriptor describes an extension. If it's at top level, its
@@ -11,7 +11,7 @@ import (
 // which it is defined.
 type ExtensionDescriptor struct {
 	common
-	*descriptor.FieldDescriptorProto
+	*proto.FieldDescriptorProto
 	parent *Descriptor // The containing message, if any.
 }
 

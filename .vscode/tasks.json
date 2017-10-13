@@ -1,0 +1,25 @@
+{
+   "version": "2.0.0",
+   "tasks": [
+      {
+         "taskName": "Run",
+         "osx": {
+            "command": "go run ./main.go"
+         },
+         "windows": {
+            "command": "go build -o toba-debug.exe ./main.go; .\\toba-debug.exe"
+         },
+         "type": "shell",
+         "group": "build",
+         "problemMatcher": [
+            "$go"
+         ],
+         "presentation": {
+            "echo": true,
+            "reveal": "always",
+            "focus": false,
+            "panel": "dedicated"
+         }
+      }
+   ]
+}

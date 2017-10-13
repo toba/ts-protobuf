@@ -1,16 +1,17 @@
-package main
+package descriptor
 
 import (
 	"fmt"
 	"strings"
 
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
+	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // Descriptor represents a protocol buffer message.
 type Descriptor struct {
 	common
-	*descriptor.DescriptorProto
+	*proto.DescriptorProto
 	parent   *Descriptor            // The containing message, if any.
 	nested   []*Descriptor          // Inner messages, if any.
 	enums    []*EnumDescriptor      // Inner enums, if any.
@@ -22,7 +23,7 @@ type Descriptor struct {
 }
 
 // Construct the Descriptor
-func newDescriptor(desc *descriptor.DescriptorProto, parent *Descriptor, file *descriptor.FileDescriptorProto, index int) *Descriptor {
+func newDescriptor(desc *proto.DescriptorProto, parent *Descriptor, file *proto.FileDescriptorProto, index int) *Descriptor {
 	d := &Descriptor{
 		common:          common{file},
 		DescriptorProto: desc,
@@ -59,7 +60,7 @@ func newDescriptor(desc *descriptor.DescriptorProto, parent *Descriptor, file *d
 }
 
 // Return a slice of all the Descriptors defined within this file
-func wrapDescriptors(file *descriptor.FileDescriptorProto) []*Descriptor {
+func wrapDescriptors(file *proto.FileDescriptorProto) []*Descriptor {
 	sl := make([]*Descriptor, 0, len(file.MessageType)+10)
 	for i, desc := range file.MessageType {
 		sl = wrapThisDescriptor(sl, desc, nil, file, i)
@@ -68,7 +69,7 @@ func wrapDescriptors(file *descriptor.FileDescriptorProto) []*Descriptor {
 }
 
 // Wrap this Descriptor, recursively
-func wrapThisDescriptor(sl []*Descriptor, desc *descriptor.DescriptorProto, parent *Descriptor, file *descriptor.FileDescriptorProto, index int) []*Descriptor {
+func wrapThisDescriptor(sl []*Descriptor, desc *proto.DescriptorProto, parent *Descriptor, file *proto.FileDescriptorProto, index int) []*Descriptor {
 	sl = append(sl, newDescriptor(desc, parent, file, index))
 	me := sl[len(sl)-1]
 	for i, nested := range desc.NestedType {
