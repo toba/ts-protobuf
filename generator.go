@@ -1,4 +1,4 @@
-package generator
+package main
 
 import (
 	"bufio"
@@ -12,9 +12,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/toba/ts-protobuf/descriptor"
-
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
+	"github.com/toba/ts-protobuf/descriptor"
 )
 
 // Generator is the type whose methods generate the output, stored in the
@@ -28,23 +27,23 @@ type Generator struct {
 	Parameter         map[string]string // Command-line parameters.
 	PackageImportPath string            // Go import path of the package we're generating code for
 	ImportPrefix      string            // String to prefix to imported package file names.
-	ImportMap         map[string]string // Mapping from .proto file name to import path
+	ImportMap         map[string]string // Mapping from .proto file name to import path.
 
 	Pkg map[string]string // The names under which we import support packages
 
-	packageName      string                                // What we're calling ourselves.
-	allFiles         []*descriptor.FileDescriptor          // All files in the tree
-	allFilesByName   map[string]*descriptor.FileDescriptor // All files by filename.
-	genFiles         []*descriptor.FileDescriptor          // Those files we will generate output for.
-	file             *descriptor.FileDescriptor            // The file we are compiling now.
-	usedPackages     map[string]bool                       // Names of packages used in current file.
-	typeNameToObject map[string]descriptor.ProtoObject     // Key is a fully-qualified name in input syntax.
-	init             []string                              // Lines to emit in the init function.
+	packageName      string                     // What we're calling ourselves.
+	allFiles         []*fileDescriptor          // All files in the tree
+	allFilesByName   map[string]*fileDescriptor // All files by filename.
+	genFiles         []*fileDescriptor          // Those files we will generate output for.
+	file             *fileDescriptor            // The file we are compiling now.
+	usedPackages     map[string]bool            // Names of packages used in current file.
+	typeNameToObject map[string]ProtoObject     // Key is a fully-qualified name in input syntax.
+	init             []string                   // Lines to emit in the init function.
 	indent           string
 	writeOutput      bool
 }
 
-// NewGenerator creates a new generator and allocates the request and response
+// new creates a new generator and allocates the request and response
 // protobufs.
 func New() *Generator {
 	g := new(Generator)
@@ -97,35 +96,9 @@ func (g *Generator) CommandLineParameters(parameter string) {
 	}
 }
 
-// For each input file, the unique package name to use, underscored.
-var uniquePackageName = make(map[*descriptor.FileDescriptorProto]string)
-
-// Package names already registered.  Key is the name from the .proto file;
-// value is the name that appears in the generated code.
-var pkgNamesInUse = make(map[string]bool)
-
-// Create and remember a guaranteed unique package name for this file descriptor.
-// Pkg is the candidate name.  If f is nil, it's a builtin package like "proto" and
-// has no file descriptor.
-func RegisterUniquePackageName(pkg string, f *descriptor.FileDescriptor) string {
-	// Convert dots to underscores before finding a unique alias.
-	pkg = strings.Map(badToUnderscore, pkg)
-
-	for i, orig := 1, pkg; pkgNamesInUse[pkg]; i++ {
-		// It's a duplicate; must rename.
-		pkg = orig + strconv.Itoa(i)
-	}
-	// Install it.
-	pkgNamesInUse[pkg] = true
-	if f != nil {
-		uniquePackageName[f.FileDescriptorProto] = pkg
-	}
-	return pkg
-}
-
 // ObjectNamed, given a fully-qualified input type name as it appears in the input data,
 // returns the descriptor for the message or enum with that name.
-func (g *Generator) ObjectNamed(typeName string) Object {
+func (g *Generator) ObjectNamed(typeName string) ProtoObject {
 	o, ok := g.typeNameToObject[typeName]
 	if !ok {
 		g.Fail("can't find object with type", typeName)
@@ -174,7 +147,7 @@ func (g *Generator) addInitf(stmt string, a ...interface{}) {
 
 // Fill the response protocol buffer with the generated output for all the files we're
 // supposed to generate.
-func (g *Generator) generate(file *FileDescriptor) {
+func (g *Generator) generate(file *fileDescriptor) {
 	g.file = g.FileOf(file.FileDescriptorProto)
 	g.usedPackages = make(map[string]bool)
 
@@ -295,12 +268,11 @@ func (g *Generator) weak(i int32) bool {
 	return false
 }
 
+// needStar returns whether the type should be a pointer.
 func needsStar(typ descriptor.FieldDescriptorProto_Type) bool {
 	switch typ {
 	case descriptor.FieldDescriptorProto_TYPE_GROUP:
-		return false
 	case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
-		return false
 	case descriptor.FieldDescriptorProto_TYPE_BYTES:
 		return false
 	}

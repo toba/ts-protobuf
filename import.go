@@ -7,6 +7,17 @@ import (
 	"github.com/toba/ts-protobuf/descriptor"
 )
 
+// importDescriptor describes a type that has been publicly imported from
+// another file.
+type importDescriptor struct {
+	common
+	o ProtoObject
+}
+
+func (id *importDescriptor) TypeName() []string {
+	return id.o.TypeName()
+}
+
 // Generate the imports
 func (g *Generator) generateImports() {
 	// We almost always need a proto import.  Rather than computing when we

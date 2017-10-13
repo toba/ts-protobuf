@@ -3,9 +3,11 @@
 // particular language.
 //
 // These descriptors are composed of the standard protobuf descriptors.
-package descriptor
+package main
 
-import proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
+import (
+	"github.com/toba/ts-protobuf/descriptor"
+)
 
 type (
 	// common is embedded in all descriptors.
@@ -15,7 +17,7 @@ type (
 	// structs have the same names as their contents, with "Proto" removed.
 	// FileDescriptor is used to store the things that it points to.
 	common struct {
-		file *proto.FileDescriptorProto // File this object comes from.
+		file *descriptor.FileDescriptorProto // File this object comes from.
 	}
 
 	// ProtoObject is an interface abstracting the abilities shared by enums,
@@ -23,7 +25,7 @@ type (
 	ProtoObject interface {
 		PackageName() string // The name we use in our output (a_b_c), possibly renamed for uniqueness.
 		TypeName() []string
-		File() *proto.FileDescriptorProto
+		File() *descriptor.FileDescriptorProto
 	}
 )
 
@@ -54,7 +56,7 @@ func (c *common) PackageName() string {
 	return uniquePackageOf(c.file)
 }
 
-func (c *common) File() *proto.FileDescriptorProto {
+func (c *common) File() *descriptor.FileDescriptorProto {
 	return c.file
 }
 

@@ -1,15 +1,14 @@
-package generator
+package main
 
 import (
 	"strconv"
 	"strings"
 
-	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
 	"github.com/toba/ts-protobuf/descriptor"
 )
 
-func extractComments(file *descriptor.FileDescriptor) {
-	file.comments = make(map[string]*proto.SourceCodeInfo_Location)
+func extractComments(file *fileDescriptor) {
+	file.comments = make(map[string]*descriptor.SourceCodeInfo_Location)
 	for _, loc := range file.GetSourceCodeInfo().GetLocation() {
 		if loc.LeadingComments == nil {
 			continue

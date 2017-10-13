@@ -1,6 +1,4 @@
-package symbol
-
-import "github.com/toba/ts-protobuf/generator"
+package generator
 
 type constOrVarSymbol struct {
 	sym  string
@@ -8,7 +6,7 @@ type constOrVarSymbol struct {
 	cast string // if non-empty, a type cast is required (used for enums)
 }
 
-func (cs constOrVarSymbol) GenerateAlias(g *generator.Generator, pkg string) {
+func (cs constOrVarSymbol) GenerateAlias(g *Generator, pkg string) {
 	v := pkg + "." + cs.sym
 	if cs.cast != "" {
 		v = cs.cast + "(" + v + ")"

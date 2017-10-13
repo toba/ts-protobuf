@@ -1,35 +1,66 @@
 package generator
 
 import (
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/toba/ts-protobuf/descriptor"
 )
 
-var isTypeScriptKeyword = map[string]bool{
-	"break":     true,
-	"case":      true,
-	"const":     true,
-	"continue":  true,
-	"default":   true,
-	"else":      true,
-	"for":       true,
-	"function":  true,
-	"goto":      true,
-	"if":        true,
-	"import":    true,
-	"interface": true,
-	"map":       true,
-	"return":    true,
-	"select":    true,
-	"switch":    true,
-	"type":      true,
-	"var":       true,
+var (
+	isTypeScriptKeyword = map[string]bool{
+		"break":     true,
+		"case":      true,
+		"const":     true,
+		"continue":  true,
+		"default":   true,
+		"else":      true,
+		"for":       true,
+		"function":  true,
+		"goto":      true,
+		"if":        true,
+		"import":    true,
+		"interface": true,
+		"map":       true,
+		"return":    true,
+		"select":    true,
+		"switch":    true,
+		"type":      true,
+		"var":       true,
+	}
+
+	// For each input file, the unique package name to use, underscored.
+	uniquePackageName = make(map[*descriptor.FileDescriptorProto]string)
+
+	// Package names already registered.  Key is the name from the .proto file;
+	// value is the name that appears in the generated code.
+	pkgNamesInUse = make(map[string]bool)
+)
+
+// Create and remember a guaranteed unique package name for this file descriptor.
+// Pkg is the candidate name.  If f is nil, it's a builtin package like "proto" and
+// has no file descriptor.
+func RegisterUniquePackageName(pkg string, f *descriptor.FileDescriptor) string {
+	// Convert dots to underscores before finding a unique alias.
+	pkg = strings.Map(badToUnderscore, pkg)
+
+	for i, orig := 1, pkg; pkgNamesInUse[pkg]; i++ {
+		// It's a duplicate; must rename.
+		pkg = orig + strconv.Itoa(i)
+	}
+	// Install it.
+	pkgNamesInUse[pkg] = true
+	if f != nil {
+		uniquePackageName[f.FileDescriptorProto] = pkg
+	}
+	return pkg
 }
 
-// DefaultPackageName returns the package name printed for the object.
-// If its file is in a different package, it returns the package name we're using for this file, plus ".".
-// Otherwise it returns the empty string.
+// DefaultPackageName returns the package name printed for the object. If its
+// file is in a different package, it returns the package name we're using for
+// this file, plus ".". Otherwise it returns the empty string.
 func (g *Generator) DefaultPackageName(obj Object) string {
 	pkg := obj.PackageName()
 	if pkg == g.packageName {
