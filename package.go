@@ -1,4 +1,4 @@
-package generator
+package main
 
 import (
 	"strconv"
@@ -6,7 +6,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/toba/ts-protobuf/descriptor"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 var (
@@ -42,7 +42,7 @@ var (
 // Create and remember a guaranteed unique package name for this file descriptor.
 // Pkg is the candidate name.  If f is nil, it's a builtin package like "proto" and
 // has no file descriptor.
-func RegisterUniquePackageName(pkg string, f *descriptor.FileDescriptor) string {
+func RegisterUniquePackageName(pkg string, f *fileDescriptor) string {
 	// Convert dots to underscores before finding a unique alias.
 	pkg = strings.Map(badToUnderscore, pkg)
 
@@ -61,7 +61,7 @@ func RegisterUniquePackageName(pkg string, f *descriptor.FileDescriptor) string 
 // DefaultPackageName returns the package name printed for the object. If its
 // file is in a different package, it returns the package name we're using for
 // this file, plus ".". Otherwise it returns the empty string.
-func (g *Generator) DefaultPackageName(obj Object) string {
+func (g *Generator) DefaultPackageName(obj ProtoObject) string {
 	pkg := obj.PackageName()
 	if pkg == g.packageName {
 		return ""

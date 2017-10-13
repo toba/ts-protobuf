@@ -1,13 +1,6 @@
-// Package descriptor defines structs that describe protobufs in a manner
-// similar to an AST. These details can then be used to generate code in a
-// particular language.
-//
-// These descriptors are composed of the standard protobuf descriptors.
 package main
 
-import (
-	"github.com/toba/ts-protobuf/descriptor"
-)
+import "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 type (
 	// common is embedded in all descriptors.

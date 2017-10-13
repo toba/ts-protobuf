@@ -9,9 +9,9 @@ import (
 	"strconv"
 	"strings"
 
-	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
+	"github.com/gogo/protobuf/proto"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
-	"github.com/toba/ts-protobuf/descriptor"
 )
 
 // FileDescriptor describes a protocol buffer descriptor file (.proto). It
@@ -29,7 +29,7 @@ type fileDescriptor struct {
 
 	// The full list of symbols that are exported, as a map from the exported
 	// object to its symbols. This is used for supporting public imports.
-	//exports map[ProtoObject][]symbol.Symbol
+	exports map[ProtoObject][]symbol
 
 	index  int  // The index of this file in the list of files to generate code for
 	proto3 bool // whether to generate proto3 code for this file
@@ -73,6 +73,26 @@ func (d *fileDescriptor) goPackageOption() (impPath, pkg string, ok bool) {
 	return
 }
 
+// goFileName returns the output name for the generated Go file.
+func (d *fileDescriptor) goFileName() string {
+	name := *d.Name
+	if ext := path.Ext(name); ext == ".proto" || ext == ".protodevel" {
+		name = name[:len(name)-len(ext)]
+	}
+	name += ".pb.go"
+
+	// Does the file have a "go_package" option?
+	// If it does, it may override the filename.
+	if impPath, _, ok := d.goPackageOption(); ok && impPath != "" {
+		// Replace the existing dirname with the declared import path.
+		_, name = path.Split(name)
+		name = path.Join(impPath, name)
+		return name
+	}
+
+	return name
+}
+
 // goPackageName returns the Go package name to use in the
 // generated Go file.  The result explicit reports whether the name
 // came from an option go_package statement.  If explicit is false,
@@ -101,10 +121,9 @@ func (d *fileDescriptor) outputFileName() string {
 	return name + ".pb.ts"
 }
 
-// TODO: fix circular dep
-// func (d *FileDescriptor) addExport(obj ProtoObject, sym symbol) {
-// 	d.exports[obj] = append(d.exports[obj], sym)
-// }
+func (d *fileDescriptor) addExport(obj ProtoObject, sym symbol) {
+	d.exports[obj] = append(d.exports[obj], sym)
+}
 
 func fileIsProto3(file *descriptor.FileDescriptorProto) bool {
 	return file.GetSyntax() == "proto3"
@@ -139,14 +158,14 @@ func (g *Generator) GenerateAllFiles() {
 			continue
 		}
 		g.Response.File = append(g.Response.File, &plugin.CodeGeneratorResponse_File{
-			Name:    proto.String(file.goFileName()),
+			Name:    proto.String(file.outputFileName()),
 			Content: proto.String(g.String()),
 		})
 	}
 }
 
 // FileOf return the FileDescriptor for this FileDescriptorProto.
-func (g *Generator) FileOf(fd *descriptor.FileDescriptorProto) *FileDescriptor {
+func (g *Generator) FileOf(fd *descriptor.FileDescriptorProto) *fileDescriptor {
 	for _, file := range g.allFiles {
 		if file.FileDescriptorProto == fd {
 			return file

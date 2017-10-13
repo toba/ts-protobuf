@@ -1,10 +1,10 @@
-package generator
+package main
 
 import (
 	"path"
 	"strconv"
 
-	"github.com/toba/ts-protobuf/descriptor"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // importDescriptor describes a type that has been publicly imported from
@@ -61,7 +61,7 @@ func (g *Generator) generateImports() {
 	g.P()
 }
 
-func (g *Generator) generateImported(id *ImportedDescriptor) {
+func (g *Generator) generateImported(id *importDescriptor) {
 	// Don't generate public import symbols for files that we are generating
 	// code for, since those symbols will already be in this package.
 	// We can't simply avoid creating the ImportedDescriptor objects,
@@ -80,7 +80,7 @@ func (g *Generator) generateImported(id *ImportedDescriptor) {
 	g.P("// ", sn, " from public import ", filename)
 	g.usedPackages[df.PackageName()] = true
 
-	for _, sym := range df.exported[id.o] {
+	for _, sym := range df.exports[id.o] {
 		sym.GenerateAlias(g, df.PackageName())
 	}
 
@@ -88,20 +88,20 @@ func (g *Generator) generateImported(id *ImportedDescriptor) {
 }
 
 // Return a slice of all the types that are publicly imported into this file.
-func wrapImported(file *descriptor.FileDescriptorProto, g *Generator) (sl []*ImportedDescriptor) {
+func wrapImported(file *descriptor.FileDescriptorProto, g *Generator) (sl []*importDescriptor) {
 	for _, index := range file.PublicDependency {
 		df := g.fileByName(file.Dependency[index])
-		for _, d := range df.desc {
+		for _, d := range df.messages {
 			if d.GetOptions().GetMapEntry() {
 				continue
 			}
-			sl = append(sl, &ImportedDescriptor{common{file}, d})
+			sl = append(sl, &importDescriptor{common{file}, d})
 		}
-		for _, e := range df.enum {
-			sl = append(sl, &ImportedDescriptor{common{file}, e})
+		for _, e := range df.enums {
+			sl = append(sl, &importDescriptor{common{file}, e})
 		}
-		for _, ext := range df.ext {
-			sl = append(sl, &ImportedDescriptor{common{file}, ext})
+		for _, ext := range df.extensions {
+			sl = append(sl, &importDescriptor{common{file}, ext})
 		}
 	}
 	return

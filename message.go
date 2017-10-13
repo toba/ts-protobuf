@@ -1,4 +1,4 @@
-package generator
+package main
 
 import (
 	"bytes"
@@ -7,9 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"github.com/toba/ts-protobuf/descriptor"
-	"github.com/toba/ts-protobuf/generator"
+	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // Method names that may be generated. Fields with these names get an
@@ -27,25 +26,25 @@ var methodNames = [...]string{
 }
 
 // Generate the type and default constant definitions for this Descriptor.
-func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
+func (g *Generator) generateMessage(message *messageDescriptor) {
 	// The full type name
 	typeName := message.TypeName()
 	// The full type name, CamelCased.
-	ccTypeName := descriptor.CamelCaseSlice(typeName)
+	ccTypeName := CamelCaseSlice(typeName)
 
 	usedNames := make(map[string]bool)
 	for _, n := range methodNames {
 		usedNames[n] = true
 	}
-	fieldNames := make(map[*proto.FieldDescriptorProto]string)
-	fieldGetterNames := make(map[*proto.FieldDescriptorProto]string)
-	fieldTypes := make(map[*proto.FieldDescriptorProto]string)
-	mapFieldTypes := make(map[*proto.FieldDescriptorProto]string)
+	fieldNames := make(map[*descriptor.FieldDescriptorProto]string)
+	fieldGetterNames := make(map[*descriptor.FieldDescriptorProto]string)
+	fieldTypes := make(map[*descriptor.FieldDescriptorProto]string)
+	mapFieldTypes := make(map[*descriptor.FieldDescriptorProto]string)
 
-	oneofFieldName := make(map[int32]string)                      // indexed by oneof_index field of FieldDescriptorProto
-	oneofDisc := make(map[int32]string)                           // name of discriminator method
-	oneofTypeName := make(map[*proto.FieldDescriptorProto]string) // without star
-	oneofInsertPoints := make(map[int32]int)                      // oneof_index => offset of g.Buffer
+	oneofFieldName := make(map[int32]string)                           // indexed by oneof_index field of FieldDescriptorProto
+	oneofDisc := make(map[int32]string)                                // name of discriminator method
+	oneofTypeName := make(map[*descriptor.FieldDescriptorProto]string) // without star
+	oneofInsertPoints := make(map[int32]int)                           // oneof_index => offset of g.Buffer
 
 	g.PrintComments(message.path)
 	g.P("type ", ccTypeName, " struct {")
@@ -111,9 +110,9 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 			g.P(fname, " ", dname, " `", tag, "`")
 		}
 
-		if *field.Type == proto.FieldDescriptorProto_TYPE_MESSAGE {
+		if *field.Type == descriptor.FieldDescriptorProto_TYPE_MESSAGE {
 			desc := g.ObjectNamed(field.GetTypeName())
-			if d, ok := desc.(*Descriptor); ok && d.GetOptions().GetMapEntry() {
+			if d, ok := desc.(*messageDescriptor); ok && d.GetOptions().GetMapEntry() {
 				// Figure out the Go types and tags for the key and value types.
 				keyField, valField := d.Field[0], d.Field[1]
 				keyType, keyWire := g.GoType(d, keyField)
@@ -125,10 +124,10 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 				// so record their use. They are not permitted as map keys.
 				keyType = strings.TrimPrefix(keyType, "*")
 				switch *valField.Type {
-				case proto.FieldDescriptorProto_TYPE_ENUM:
+				case descriptor.FieldDescriptorProto_TYPE_ENUM:
 					valType = strings.TrimPrefix(valType, "*")
 					g.RecordTypeUse(valField.GetTypeName())
-				case proto.FieldDescriptorProto_TYPE_MESSAGE:
+				case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 					g.RecordTypeUse(valField.GetTypeName())
 				default:
 					valType = strings.TrimPrefix(valType, "*")
@@ -212,7 +211,7 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 	}
 	g.P("func (*", ccTypeName, ") Descriptor() ([]byte, []int) { return ", g.file.VarName(), ", []int{", strings.Join(indexes, ", "), "} }")
 	// TODO: Revisit the decision to use a XXX_WellKnownType method
-	// if we change proto.MessageName to work with multiple equivalents.
+	// if we change descriptor.MessageName to work with multiple equivalents.
 	if message.file.GetPackage() == "google.protobuf" && wellKnownTypes[message.GetName()] {
 		g.P("func (*", ccTypeName, `) XXX_WellKnownType() string { return "`, message.GetName(), `" }`)
 	}
@@ -245,7 +244,7 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 			g.P("return ", g.Pkg["proto"], ".UnmarshalMessageSetJSON(buf, &m.XXX_InternalExtensions)")
 			g.Out()
 			g.P("}")
-			g.P("// ensure ", ccTypeName, " satisfies proto.Marshaler and proto.Unmarshaler")
+			g.P("// ensure ", ccTypeName, " satisfies descriptor.Marshaler and descriptor.Unmarshaler")
 			g.P("var _ ", g.Pkg["proto"], ".Marshaler = (*", ccTypeName, ")(nil)")
 			g.P("var _ ", g.Pkg["proto"], ".Unmarshaler = (*", ccTypeName, ")(nil)")
 		}
@@ -267,7 +266,7 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 	}
 
 	// Default constants
-	defNames := make(map[*proto.FieldDescriptorProto]string)
+	defNames := make(map[*descriptor.FieldDescriptorProto]string)
 	for _, field := range message.Field {
 		def := field.GetDefaultValue()
 		if def == "" {
@@ -297,19 +296,19 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 			case "nan":
 				def = "math.NaN()"
 			}
-			if *field.Type == proto.FieldDescriptorProto_TYPE_FLOAT {
+			if *field.Type == descriptor.FieldDescriptorProto_TYPE_FLOAT {
 				def = "float32(" + def + ")"
 			}
 			kind = "var "
-		case *field.Type == proto.FieldDescriptorProto_TYPE_ENUM:
+		case *field.Type == descriptor.FieldDescriptorProto_TYPE_ENUM:
 			// Must be an enum.  Need to construct the prefixed name.
 			obj := g.ObjectNamed(field.GetTypeName())
-			var enum *EnumDescriptor
-			if id, ok := obj.(*ImportedDescriptor); ok {
+			var enum *enumDescriptor
+			if id, ok := obj.(*importDescriptor); ok {
 				// The enum type has been publicly imported.
-				enum, _ = id.o.(*EnumDescriptor)
+				enum, _ = id.o.(*enumDescriptor)
 			} else {
-				enum, _ = obj.(*EnumDescriptor)
+				enum, _ = obj.(*enumDescriptor)
 			}
 			if enum == nil {
 				log.Printf("don't know how to generate constant for %s", fieldname)
@@ -380,7 +379,7 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 		// and for messages and enums in the same package.
 		// Groups are not exported.
 		// Foreign types can't be hoisted through a public import because
-		// the importer may not already be importing the defining .proto.
+		// the importer may not already be importing the defining .descriptor.
 		// As an example, imagine we have an import tree like this:
 		//   A.proto -> B.proto -> C.proto
 		// If A publicly imports B, we need to generate the getters from B in A's output,
@@ -388,9 +387,9 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 		// because A is not importing C already.
 		var getter, genType bool
 		switch *field.Type {
-		case proto.FieldDescriptorProto_TYPE_GROUP:
+		case descriptor.FieldDescriptorProto_TYPE_GROUP:
 			getter = false
-		case descriptor.FieldDescriptorProto_TYPE_MESSAGE, proto.FieldDescriptorProto_TYPE_ENUM:
+		case descriptor.FieldDescriptorProto_TYPE_MESSAGE, descriptor.FieldDescriptorProto_TYPE_ENUM:
 			// Only export getter if its return type is in this package.
 			getter = g.ObjectNamed(field.GetTypeName()).PackageName() == message.PackageName()
 			genType = true
@@ -411,9 +410,9 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 		def, hasDef := defNames[field]
 		typeDefaultIsNil := false // whether this field type's default value is a literal nil unless specified
 		switch *field.Type {
-		case proto.FieldDescriptorProto_TYPE_BYTES:
+		case descriptor.FieldDescriptorProto_TYPE_BYTES:
 			typeDefaultIsNil = !hasDef
-		case proto.FieldDescriptorProto_TYPE_GROUP, proto.FieldDescriptorProto_TYPE_MESSAGE:
+		case descriptor.FieldDescriptorProto_TYPE_GROUP, descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 			typeDefaultIsNil = true
 		}
 		if isRepeated(field) {
@@ -460,25 +459,25 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 			}
 		} else {
 			switch *field.Type {
-			case proto.FieldDescriptorProto_TYPE_BOOL:
+			case descriptor.FieldDescriptorProto_TYPE_BOOL:
 				g.P("return false")
-			case proto.FieldDescriptorProto_TYPE_STRING:
+			case descriptor.FieldDescriptorProto_TYPE_STRING:
 				g.P(`return ""`)
-			case proto.FieldDescriptorProto_TYPE_GROUP,
-				proto.FieldDescriptorProto_TYPE_MESSAGE,
-				proto.FieldDescriptorProto_TYPE_BYTES:
+			case descriptor.FieldDescriptorProto_TYPE_GROUP,
+				descriptor.FieldDescriptorProto_TYPE_MESSAGE,
+				descriptor.FieldDescriptorProto_TYPE_BYTES:
 				// This is only possible for oneof fields.
 				g.P("return nil")
 			case descriptor.FieldDescriptorProto_TYPE_ENUM:
 				// The default default for an enum is the first value in the enum,
 				// not zero.
 				obj := g.ObjectNamed(field.GetTypeName())
-				var enum *EnumDescriptor
-				if id, ok := obj.(*ImportedDescriptor); ok {
+				var enum *enumDescriptor
+				if id, ok := obj.(*importDescriptor); ok {
 					// The enum type has been publicly imported.
-					enum, _ = id.o.(*EnumDescriptor)
+					enum, _ = id.o.(*enumDescriptor)
 				} else {
-					enum, _ = obj.(*EnumDescriptor)
+					enum, _ = obj.(*enumDescriptor)
 				}
 				if enum == nil {
 					log.Printf("don't know how to generate getter for %s", field.GetName())
@@ -512,7 +511,7 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 
 	// Oneof functions
 	if len(message.OneofDecl) > 0 {
-		fieldWire := make(map[*proto.FieldDescriptorProto]string)
+		fieldWire := make(map[*descriptor.FieldDescriptorProto]string)
 
 		// method
 		enc := "_" + ccTypeName + "_OneofMarshaler"
@@ -551,56 +550,56 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 				val := "x." + fieldNames[field] // overridden for TYPE_BOOL
 				canFail := false                // only TYPE_MESSAGE and TYPE_GROUP can fail
 				switch *field.Type {
-				case proto.FieldDescriptorProto_TYPE_DOUBLE:
+				case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
 					wire = "WireFixed64"
 					pre = "b.EncodeFixed64(" + g.Pkg["math"] + ".Float64bits("
 					post = "))"
-				case proto.FieldDescriptorProto_TYPE_FLOAT:
+				case descriptor.FieldDescriptorProto_TYPE_FLOAT:
 					wire = "WireFixed32"
 					pre = "b.EncodeFixed32(uint64(" + g.Pkg["math"] + ".Float32bits("
 					post = ")))"
-				case proto.FieldDescriptorProto_TYPE_INT64,
-					proto.FieldDescriptorProto_TYPE_UINT64:
+				case descriptor.FieldDescriptorProto_TYPE_INT64,
+					descriptor.FieldDescriptorProto_TYPE_UINT64:
 					wire = "WireVarint"
 					pre, post = "b.EncodeVarint(uint64(", "))"
-				case proto.FieldDescriptorProto_TYPE_INT32,
-					proto.FieldDescriptorProto_TYPE_UINT32,
-					proto.FieldDescriptorProto_TYPE_ENUM:
+				case descriptor.FieldDescriptorProto_TYPE_INT32,
+					descriptor.FieldDescriptorProto_TYPE_UINT32,
+					descriptor.FieldDescriptorProto_TYPE_ENUM:
 					wire = "WireVarint"
 					pre, post = "b.EncodeVarint(uint64(", "))"
-				case proto.FieldDescriptorProto_TYPE_FIXED64,
-					proto.FieldDescriptorProto_TYPE_SFIXED64:
+				case descriptor.FieldDescriptorProto_TYPE_FIXED64,
+					descriptor.FieldDescriptorProto_TYPE_SFIXED64:
 					wire = "WireFixed64"
 					pre, post = "b.EncodeFixed64(uint64(", "))"
-				case proto.FieldDescriptorProto_TYPE_FIXED32,
-					proto.FieldDescriptorProto_TYPE_SFIXED32:
+				case descriptor.FieldDescriptorProto_TYPE_FIXED32,
+					descriptor.FieldDescriptorProto_TYPE_SFIXED32:
 					wire = "WireFixed32"
 					pre, post = "b.EncodeFixed32(uint64(", "))"
-				case proto.FieldDescriptorProto_TYPE_BOOL:
+				case descriptor.FieldDescriptorProto_TYPE_BOOL:
 					// bool needs special handling.
 					g.P("t := uint64(0)")
 					g.P("if ", val, " { t = 1 }")
 					val = "t"
 					wire = "WireVarint"
 					pre, post = "b.EncodeVarint(", ")"
-				case proto.FieldDescriptorProto_TYPE_STRING:
+				case descriptor.FieldDescriptorProto_TYPE_STRING:
 					wire = "WireBytes"
 					pre, post = "b.EncodeStringBytes(", ")"
-				case proto.FieldDescriptorProto_TYPE_GROUP:
+				case descriptor.FieldDescriptorProto_TYPE_GROUP:
 					wire = "WireStartGroup"
 					pre, post = "b.Marshal(", ")"
 					canFail = true
-				case proto.FieldDescriptorProto_TYPE_MESSAGE:
+				case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 					wire = "WireBytes"
 					pre, post = "b.EncodeMessage(", ")"
 					canFail = true
-				case proto.FieldDescriptorProto_TYPE_BYTES:
+				case descriptor.FieldDescriptorProto_TYPE_BYTES:
 					wire = "WireBytes"
 					pre, post = "b.EncodeRawBytes(", ")"
-				case proto.FieldDescriptorProto_TYPE_SINT32:
+				case descriptor.FieldDescriptorProto_TYPE_SINT32:
 					wire = "WireVarint"
 					pre, post = "b.EncodeZigzag32(uint64(", "))"
-				case proto.FieldDescriptorProto_TYPE_SINT64:
+				case descriptor.FieldDescriptorProto_TYPE_SINT64:
 					wire = "WireVarint"
 					pre, post = "b.EncodeZigzag64(uint64(", "))"
 				default:
@@ -643,48 +642,48 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 			lhs := "x, err" // overridden for TYPE_MESSAGE and TYPE_GROUP
 			var dec, cast, cast2 string
 			switch *field.Type {
-			case proto.FieldDescriptorProto_TYPE_DOUBLE:
+			case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
 				dec, cast = "b.DecodeFixed64()", g.Pkg["math"]+".Float64frombits"
-			case proto.FieldDescriptorProto_TYPE_FLOAT:
+			case descriptor.FieldDescriptorProto_TYPE_FLOAT:
 				dec, cast, cast2 = "b.DecodeFixed32()", "uint32", g.Pkg["math"]+".Float32frombits"
-			case proto.FieldDescriptorProto_TYPE_INT64:
+			case descriptor.FieldDescriptorProto_TYPE_INT64:
 				dec, cast = "b.DecodeVarint()", "int64"
-			case proto.FieldDescriptorProto_TYPE_UINT64:
+			case descriptor.FieldDescriptorProto_TYPE_UINT64:
 				dec = "b.DecodeVarint()"
-			case proto.FieldDescriptorProto_TYPE_INT32:
+			case descriptor.FieldDescriptorProto_TYPE_INT32:
 				dec, cast = "b.DecodeVarint()", "int32"
-			case proto.FieldDescriptorProto_TYPE_FIXED64:
+			case descriptor.FieldDescriptorProto_TYPE_FIXED64:
 				dec = "b.DecodeFixed64()"
-			case proto.FieldDescriptorProto_TYPE_FIXED32:
+			case descriptor.FieldDescriptorProto_TYPE_FIXED32:
 				dec, cast = "b.DecodeFixed32()", "uint32"
-			case proto.FieldDescriptorProto_TYPE_BOOL:
+			case descriptor.FieldDescriptorProto_TYPE_BOOL:
 				dec = "b.DecodeVarint()"
 				// handled specially below
-			case proto.FieldDescriptorProto_TYPE_STRING:
+			case descriptor.FieldDescriptorProto_TYPE_STRING:
 				dec = "b.DecodeStringBytes()"
-			case proto.FieldDescriptorProto_TYPE_GROUP:
+			case descriptor.FieldDescriptorProto_TYPE_GROUP:
 				g.P("msg := new(", fieldTypes[field][1:], ")") // drop star
 				lhs = "err"
 				dec = "b.DecodeGroup(msg)"
 				// handled specially below
-			case proto.FieldDescriptorProto_TYPE_MESSAGE:
+			case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 				g.P("msg := new(", fieldTypes[field][1:], ")") // drop star
 				lhs = "err"
 				dec = "b.DecodeMessage(msg)"
 				// handled specially below
-			case proto.FieldDescriptorProto_TYPE_BYTES:
+			case descriptor.FieldDescriptorProto_TYPE_BYTES:
 				dec = "b.DecodeRawBytes(true)"
-			case proto.FieldDescriptorProto_TYPE_UINT32:
+			case descriptor.FieldDescriptorProto_TYPE_UINT32:
 				dec, cast = "b.DecodeVarint()", "uint32"
-			case proto.FieldDescriptorProto_TYPE_ENUM:
+			case descriptor.FieldDescriptorProto_TYPE_ENUM:
 				dec, cast = "b.DecodeVarint()", fieldTypes[field]
-			case proto.FieldDescriptorProto_TYPE_SFIXED32:
+			case descriptor.FieldDescriptorProto_TYPE_SFIXED32:
 				dec, cast = "b.DecodeFixed32()", "int32"
-			case proto.FieldDescriptorProto_TYPE_SFIXED64:
+			case descriptor.FieldDescriptorProto_TYPE_SFIXED64:
 				dec, cast = "b.DecodeFixed64()", "int64"
-			case proto.FieldDescriptorProto_TYPE_SINT32:
+			case descriptor.FieldDescriptorProto_TYPE_SINT32:
 				dec, cast = "b.DecodeZigzag32()", "int32"
-			case proto.FieldDescriptorProto_TYPE_SINT64:
+			case descriptor.FieldDescriptorProto_TYPE_SINT64:
 				dec, cast = "b.DecodeZigzag64()", "int64"
 			default:
 				g.Fail("unhandled oneof field type ", field.Type.String())
@@ -698,10 +697,10 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 				val = cast2 + "(" + val + ")"
 			}
 			switch *field.Type {
-			case proto.FieldDescriptorProto_TYPE_BOOL:
+			case descriptor.FieldDescriptorProto_TYPE_BOOL:
 				val += " != 0"
-			case proto.FieldDescriptorProto_TYPE_GROUP,
-				proto.FieldDescriptorProto_TYPE_MESSAGE:
+			case descriptor.FieldDescriptorProto_TYPE_GROUP,
+				descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 				val = "msg"
 			}
 			g.P("m.", oneofFieldName[*field.OneofIndex], " = &", oneofTypeName[field], "{", val, "}")
@@ -727,50 +726,50 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 				val := "x." + fieldNames[field]
 				var wire, varint, fixed string
 				switch *field.Type {
-				case proto.FieldDescriptorProto_TYPE_DOUBLE:
+				case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
 					wire = "WireFixed64"
 					fixed = "8"
-				case proto.FieldDescriptorProto_TYPE_FLOAT:
+				case descriptor.FieldDescriptorProto_TYPE_FLOAT:
 					wire = "WireFixed32"
 					fixed = "4"
-				case proto.FieldDescriptorProto_TYPE_INT64,
-					proto.FieldDescriptorProto_TYPE_UINT64,
-					proto.FieldDescriptorProto_TYPE_INT32,
-					proto.FieldDescriptorProto_TYPE_UINT32,
-					proto.FieldDescriptorProto_TYPE_ENUM:
+				case descriptor.FieldDescriptorProto_TYPE_INT64,
+					descriptor.FieldDescriptorProto_TYPE_UINT64,
+					descriptor.FieldDescriptorProto_TYPE_INT32,
+					descriptor.FieldDescriptorProto_TYPE_UINT32,
+					descriptor.FieldDescriptorProto_TYPE_ENUM:
 					wire = "WireVarint"
 					varint = val
-				case proto.FieldDescriptorProto_TYPE_FIXED64,
-					proto.FieldDescriptorProto_TYPE_SFIXED64:
+				case descriptor.FieldDescriptorProto_TYPE_FIXED64,
+					descriptor.FieldDescriptorProto_TYPE_SFIXED64:
 					wire = "WireFixed64"
 					fixed = "8"
-				case proto.FieldDescriptorProto_TYPE_FIXED32,
-					proto.FieldDescriptorProto_TYPE_SFIXED32:
+				case descriptor.FieldDescriptorProto_TYPE_FIXED32,
+					descriptor.FieldDescriptorProto_TYPE_SFIXED32:
 					wire = "WireFixed32"
 					fixed = "4"
-				case proto.FieldDescriptorProto_TYPE_BOOL:
+				case descriptor.FieldDescriptorProto_TYPE_BOOL:
 					wire = "WireVarint"
 					fixed = "1"
-				case proto.FieldDescriptorProto_TYPE_STRING:
+				case descriptor.FieldDescriptorProto_TYPE_STRING:
 					wire = "WireBytes"
 					fixed = "len(" + val + ")"
 					varint = fixed
-				case proto.FieldDescriptorProto_TYPE_GROUP:
+				case descriptor.FieldDescriptorProto_TYPE_GROUP:
 					wire = "WireStartGroup"
 					fixed = g.Pkg["proto"] + ".Size(" + val + ")"
-				case proto.FieldDescriptorProto_TYPE_MESSAGE:
+				case descriptor.FieldDescriptorProto_TYPE_MESSAGE:
 					wire = "WireBytes"
 					g.P("s := ", g.Pkg["proto"], ".Size(", val, ")")
 					fixed = "s"
 					varint = fixed
-				case proto.FieldDescriptorProto_TYPE_BYTES:
+				case descriptor.FieldDescriptorProto_TYPE_BYTES:
 					wire = "WireBytes"
 					fixed = "len(" + val + ")"
 					varint = fixed
-				case proto.FieldDescriptorProto_TYPE_SINT32:
+				case descriptor.FieldDescriptorProto_TYPE_SINT32:
 					wire = "WireVarint"
 					varint = "(uint32(" + val + ") << 1) ^ uint32((int32(" + val + ") >> 31))"
-				case proto.FieldDescriptorProto_TYPE_SINT64:
+				case descriptor.FieldDescriptorProto_TYPE_SINT64:
 					wire = "WireVarint"
 					varint = "uint64(" + val + " << 1) ^ uint64((int64(" + val + ") >> 63))"
 				default:
@@ -797,7 +796,7 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 		g.P()
 	}
 
-	for _, ext := range message.ext {
+	for _, ext := range message.extensions {
 		g.generateExtension(ext)
 	}
 
@@ -810,7 +809,7 @@ func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 }
 
 // Scan the messages in this file.  For each one, build the slice of nested descriptors
-func (g *Generator) buildNestedMessages(descs []*descriptor.MessageDescriptor) {
+func (g *Generator) buildNestedMessages(descs []*messageDescriptor) {
 	for _, desc := range descs {
 		if len(desc.NestedType) != 0 {
 			for _, nest := range descs {
@@ -826,10 +825,11 @@ func (g *Generator) buildNestedMessages(descs []*descriptor.MessageDescriptor) {
 }
 
 type messageSymbol struct {
-	sym                         string
-	hasExtensions, isMessageSet bool
-	hasOneof                    bool
-	getters                     []getterSymbol
+	sym           string
+	hasExtensions bool
+	isMessageSet  bool
+	hasOneof      bool
+	getters       []getterSymbol
 }
 
 func (ms *messageSymbol) GenerateAlias(g *generator.Generator, pkg string) {
@@ -975,7 +975,7 @@ func (ms *messageSymbol) GenerateAlias(g *generator.Generator, pkg string) {
 // Descriptor represents a protocol buffer message.
 type messageDescriptor struct {
 	common
-	*proto.DescriptorProto
+	*descriptor.DescriptorProto
 	parent     *messageDescriptor     // The containing message, if any.
 	nested     []*messageDescriptor   // Inner messages, if any.
 	enums      []*enumDescriptor      // Inner enums, if any.
@@ -986,8 +986,8 @@ type messageDescriptor struct {
 	group      bool
 }
 
-func newMessage(desc *descriptor.DescriptorProto, parent *messageDescriptor, file *descriptor.FileDescriptorProto, index int) *MessageDescriptor {
-	d := &MessageDescriptor{
+func newMessage(desc *descriptor.DescriptorProto, parent *messageDescriptor, file *descriptor.FileDescriptorProto, index int) *messageDescriptor {
+	d := &messageDescriptor{
 		common:          common{file},
 		DescriptorProto: desc,
 		parent:          parent,
@@ -1008,7 +1008,7 @@ func newMessage(desc *descriptor.DescriptorProto, parent *messageDescriptor, fil
 		}
 		exp := "." + strings.Join(parts, ".")
 		for _, field := range parent.Field {
-			if field.GetType() == proto.FieldDescriptorProto_TYPE_GROUP && field.GetTypeName() == exp {
+			if field.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP && field.GetTypeName() == exp {
 				d.group = true
 				break
 			}
@@ -1016,15 +1016,15 @@ func newMessage(desc *descriptor.DescriptorProto, parent *messageDescriptor, fil
 	}
 
 	for _, field := range desc.Extension {
-		d.extensions = append(d.extensions, &ExtensionDescriptor{common{file}, field, d})
+		d.extensions = append(d.extensions, &extensionDescriptor{common{file}, field, d})
 	}
 
 	return d
 }
 
 // Return a slice of all the Messages defined within this file
-func wrapMessages(file *proto.FileDescriptorProto) []*MessageDescriptor {
-	sl := make([]*MessageDescriptor, 0, len(file.MessageType)+10)
+func wrapMessages(file *descriptor.FileDescriptorProto) []*messageDescriptor {
+	sl := make([]*messageDescriptor, 0, len(file.MessageType)+10)
 	for i, desc := range file.MessageType {
 		sl = wrapThisDescriptor(sl, desc, nil, file, i)
 	}
@@ -1032,7 +1032,7 @@ func wrapMessages(file *proto.FileDescriptorProto) []*MessageDescriptor {
 }
 
 // Wrap this Descriptor, recursively
-func wrapThisDescriptor(sl []*MessageDescriptor, desc *proto.DescriptorProto, parent *MessageDescriptor, file *proto.FileDescriptorProto, index int) []*MessageDescriptor {
+func wrapThisDescriptor(sl []*messageDescriptor, desc *descriptor.DescriptorProto, parent *messageDescriptor, file *descriptor.FileDescriptorProto, index int) []*messageDescriptor {
 	sl = append(sl, newMessage(desc, parent, file, index))
 	me := sl[len(sl)-1]
 	for i, nested := range desc.NestedType {
@@ -1043,7 +1043,7 @@ func wrapThisDescriptor(sl []*MessageDescriptor, desc *proto.DescriptorProto, pa
 
 // TypeName returns the elements of the dotted type name. The package name is
 // not part of this name.
-func (d *MessageDescriptor) TypeName() []string {
+func (d *messageDescriptor) TypeName() []string {
 	if d.typename != nil {
 		return d.typename
 	}

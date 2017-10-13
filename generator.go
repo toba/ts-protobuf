@@ -1,3 +1,8 @@
+// Package descriptor defines structs that describe protobufs in a manner
+// similar to an AST. These details can then be used to generate code in a
+// particular language.
+//
+// These descriptors are composed of the standard protobuf descriptors.
 package main
 
 import (
@@ -12,8 +17,8 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 	plugin "github.com/golang/protobuf/protoc-gen-go/plugin"
-	"github.com/toba/ts-protobuf/descriptor"
 )
 
 // Generator is the type whose methods generate the output, stored in the
@@ -45,7 +50,7 @@ type Generator struct {
 
 // new creates a new generator and allocates the request and response
 // protobufs.
-func New() *Generator {
+func NewGenerator() *Generator {
 	g := new(Generator)
 	g.Buffer = new(bytes.Buffer)
 	g.Request = new(plugin.CodeGeneratorRequest)
@@ -71,18 +76,18 @@ func (g *Generator) Fail(msgs ...string) {
 // in the parameter (a member of the request protobuf) into a key/value map.
 // It then sets file name mappings defined by those entries.
 func (g *Generator) CommandLineParameters(parameter string) {
-	g.Param = make(map[string]string)
+	g.Parameter = make(map[string]string)
 	for _, p := range strings.Split(parameter, ",") {
 		if i := strings.Index(p, "="); i < 0 {
-			g.Param[p] = ""
+			g.Parameter[p] = ""
 		} else {
-			g.Param[p[0:i]] = p[i+1:]
+			g.Parameter[p[0:i]] = p[i+1:]
 		}
 	}
 
 	g.ImportMap = make(map[string]string)
 
-	for k, v := range g.Param {
+	for k, v := range g.Parameter {
 		switch k {
 		case "import_prefix":
 			g.ImportPrefix = v
@@ -122,7 +127,7 @@ func (g *Generator) ObjectNamed(typeName string) ProtoObject {
 	Loop:
 		for _, dep := range g.file.Dependency {
 			df := g.fileByName(*g.fileByName(dep).Name)
-			for _, td := range df.imp {
+			for _, td := range df.imports {
 				if td.o == o {
 					// Found it!
 					o = td
@@ -159,20 +164,20 @@ func (g *Generator) generate(file *fileDescriptor) {
 		g.P("// proto package needs to be updated.")
 		g.P()
 	}
-	for _, td := range g.file.imp {
+	for _, td := range g.file.imports {
 		g.generateImported(td)
 	}
-	for _, enum := range g.file.enum {
+	for _, enum := range g.file.enums {
 		g.generateEnum(enum)
 	}
-	for _, desc := range g.file.desc {
+	for _, desc := range g.file.messages {
 		// Don't generate virtual messages for maps.
 		if desc.GetOptions().GetMapEntry() {
 			continue
 		}
 		g.generateMessage(desc)
 	}
-	for _, ext := range g.file.ext {
+	for _, ext := range g.file.extensions {
 		g.generateExtension(ext)
 	}
 	g.generateInitFunction()
@@ -239,7 +244,7 @@ func (g *Generator) generateHeader() {
 		g.P("It is generated from these files:")
 		for _, f := range g.genFiles {
 			g.P("\t", f.Name)
-			for _, msg := range f.desc {
+			for _, msg := range f.messages {
 				if msg.parent != nil {
 					continue
 				}
@@ -280,15 +285,15 @@ func needsStar(typ descriptor.FieldDescriptorProto_Type) bool {
 }
 
 func (g *Generator) generateInitFunction() {
-	for _, enum := range g.file.enum {
+	for _, enum := range g.file.enums {
 		g.generateEnumRegistration(enum)
 	}
-	for _, d := range g.file.desc {
-		for _, ext := range d.ext {
+	for _, msg := range g.file.messages {
+		for _, ext := range msg.extensions {
 			g.generateExtensionRegistration(ext)
 		}
 	}
-	for _, ext := range g.file.ext {
+	for _, ext := range g.file.extensions {
 		g.generateExtensionRegistration(ext)
 	}
 	if len(g.init) == 0 {

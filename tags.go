@@ -1,4 +1,4 @@
-package generator
+package main
 
 import (
 	"fmt"
@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/toba/ts-protobuf/descriptor"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // The tag is a string like "varint,2,opt,name=fieldname,def=7" that
@@ -22,7 +22,7 @@ import (
 //	def= string representation of the default value, if any.
 // The default value must be in a representation that can be used at run-time
 // to generate the default value. Thus bools become 0 and 1, for instance.
-func (g *Generator) goTag(message *Descriptor, field *descriptor.FieldDescriptorProto, wiretype string) string {
+func (g *Generator) goTag(message *messageDescriptor, field *descriptor.FieldDescriptorProto, wiretype string) string {
 	optrepreq := ""
 	switch {
 	case isOptional(field):
@@ -54,7 +54,7 @@ func (g *Generator) goTag(message *Descriptor, field *descriptor.FieldDescriptor
 				// We need the underlying type.
 				obj = id.o
 			}
-			enum, ok := obj.(*EnumDescriptor)
+			enum, ok := obj.(*enumDescriptor)
 			if !ok {
 				log.Printf("obj is a %T", obj)
 				if id, ok := obj.(*ImportedDescriptor); ok {

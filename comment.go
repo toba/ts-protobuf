@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/toba/ts-protobuf/descriptor"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 func extractComments(file *fileDescriptor) {

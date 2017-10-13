@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/toba/ts-protobuf/descriptor"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // Generate the enum definitions for this EnumDescriptor.
@@ -84,7 +84,7 @@ func (g *Generator) generateEnum(enum *enumDescriptor) {
 	}
 
 	var indexes []string
-	for m := enum.parent; m != nil; m = m.parent {
+	for m := enum.message; m != nil; m = m.parent {
 		// XXX: skip groups?
 		indexes = append([]string{strconv.Itoa(m.index)}, indexes...)
 	}
@@ -114,7 +114,7 @@ func (g *Generator) buildNestedEnums(descs []*messageDescriptor, enums []*enumDe
 	for _, desc := range descs {
 		if len(desc.EnumType) != 0 {
 			for _, enum := range enums {
-				if enum.parent == desc {
+				if enum.message == desc {
 					desc.enums = append(desc.enums, enum)
 				}
 			}

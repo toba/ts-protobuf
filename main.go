@@ -5,11 +5,10 @@ import (
 	"os"
 
 	"github.com/gogo/protobuf/proto"
-	"github.com/toba/ts-protobuf/generator"
 )
 
 func main() {
-	g := generator.New()
+	g := NewGenerator()
 
 	data, err := ioutil.ReadAll(os.Stdin)
 	if err != nil {

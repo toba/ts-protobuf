@@ -3,8 +3,7 @@ package main
 import (
 	"strings"
 
-	"github.com/toba/ts-protobuf/descriptor"
-	"github.com/toba/ts-protobuf/symbol"
+	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // ExtensionDescriptor describes an extension. If it's at top level, its
@@ -13,7 +12,7 @@ import (
 type extensionDescriptor struct {
 	common
 	*descriptor.FieldDescriptorProto
-	message *messageDescriptor // The containing message, if any.
+	message *messageDescriptor
 }
 
 // TypeName returns the elements of the dotted type name.
@@ -44,10 +43,10 @@ func (e *extensionDescriptor) DescName() string {
 	return "E_" + strings.Join(typeName, "_")
 }
 
-// Return a slice of all the top-level ExtensionDescriptors defined within this
+// Return a slice of all the top-level extensionDescriptors defined within this
 // file.
 func wrapExtensions(file *descriptor.FileDescriptorProto) []*extensionDescriptor {
-	var sl []*=extensionDescriptor
+	var sl []*extensionDescriptor
 	for _, field := range file.Extension {
 		sl = append(sl, &extensionDescriptor{common{file}, field, nil})
 	}
@@ -68,7 +67,7 @@ func (g *Generator) generateExtension(ext *extensionDescriptor) {
 	}
 	extendedType := "*" + g.TypeName(extObj) // always use the original
 	field := ext.FieldDescriptorProto
-	fieldType, wireType := g.GoType(ext.parent, field)
+	fieldType, wireType := g.GoType(ext.message, field)
 	tag := g.goTag(extDesc, field, wireType)
 	g.RecordTypeUse(*ext.Extendee)
 	if n := ext.FieldDescriptorProto.TypeName; n != nil {

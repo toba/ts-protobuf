@@ -1,4 +1,4 @@
-package generator
+package main
 
 type getterSymbol struct {
 	name     string

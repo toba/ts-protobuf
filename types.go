@@ -1,6 +1,6 @@
-package generator
+package main
 
-import "github.com/toba/ts-protobuf/descriptor"
+import "github.com/golang/protobuf/protoc-gen-go/descriptor"
 
 // Names of messages in the `google.protobuf` package for which
 // we will generate XXX_WellKnownType methods.
@@ -53,18 +53,18 @@ func (g *Generator) BuildTypeNameMap() {
 // Otherwise the object is from another package; and the result is the underscored
 // package name followed by the item name.
 // The result always has an initial capital.
-func (g *Generator) TypeName(obj Object) string {
+func (g *Generator) TypeName(obj ProtoObject) string {
 	return g.DefaultPackageName(obj) + CamelCaseSlice(obj.TypeName())
 }
 
 // TypeNameWithPackage is like TypeName, but always includes the package
 // name even if the object is in our own package.
-func (g *Generator) TypeNameWithPackage(obj Object) string {
+func (g *Generator) TypeNameWithPackage(obj ProtoObject) string {
 	return obj.PackageName() + CamelCaseSlice(obj.TypeName())
 }
 
 // GoType returns a string representing the type name, and the wire type
-func (g *Generator) GoType(message *Descriptor, field *descriptor.FieldDescriptorProto) (typ string, wire string) {
+func (g *Generator) GoType(message *messageDescriptor, field *descriptor.FieldDescriptorProto) (typ string, wire string) {
 	// TODO: Options.
 	switch *field.Type {
 	case descriptor.FieldDescriptorProto_TYPE_DOUBLE:
@@ -133,8 +133,8 @@ func (g *Generator) RecordTypeUse(t string) {
 // and FileDescriptorProtos into file-referenced objects within the Generator.
 // It also creates the list of files to generate and so should be called before GenerateAllFiles.
 func (g *Generator) WrapTypes() {
-	g.allFiles = make([]*descriptor.FileDescriptor, 0, len(g.Request.ProtoFile))
-	g.allFilesByName = make(map[string]*descriptor.FileDescriptor, len(g.allFiles))
+	g.allFiles = make([]*fileDescriptor, 0, len(g.Request.ProtoFile))
+	g.allFilesByName = make(map[string]*fileDescriptor, len(g.allFiles))
 	for _, f := range g.Request.ProtoFile {
 		// We must wrap the descriptors before we wrap the enums
 		descs := wrapMessages(f)
@@ -142,7 +142,7 @@ func (g *Generator) WrapTypes() {
 		enums := wrapEnumDescriptors(f, descs)
 		g.buildNestedEnums(descs, enums)
 		exts := wrapExtensions(f)
-		fd := &FileDescriptor{
+		fd := &fileDescriptor{
 			FileDescriptorProto: f,
 			desc:                descs,
 			enum:                enums,
@@ -158,7 +158,7 @@ func (g *Generator) WrapTypes() {
 		fd.imp = wrapImported(fd.FileDescriptorProto, g)
 	}
 
-	g.genFiles = make([]*FileDescriptor, 0, len(g.Request.FileToGenerate))
+	g.genFiles = make([]*fileDescriptor, 0, len(g.Request.FileToGenerate))
 	for _, fileName := range g.Request.FileToGenerate {
 		fd := g.allFilesByName[fileName]
 		if fd == nil {
