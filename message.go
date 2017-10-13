@@ -7,7 +7,6 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/gogo/protobuf/protoc-gen-gogo/generator"
 	"github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
@@ -832,7 +831,7 @@ type messageSymbol struct {
 	getters       []getterSymbol
 }
 
-func (ms *messageSymbol) GenerateAlias(g *generator.Generator, pkg string) {
+func (ms *messageSymbol) GenerateAlias(g *Generator, pkg string) {
 	remoteSym := pkg + "." + ms.sym
 
 	g.P("type ", ms.sym, " ", remoteSym)
