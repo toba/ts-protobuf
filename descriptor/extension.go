@@ -12,18 +12,18 @@ import (
 type ExtensionDescriptor struct {
 	common
 	*proto.FieldDescriptorProto
-	parent *Descriptor // The containing message, if any.
+	message *MessageDescriptor // The containing message, if any.
 }
 
 // TypeName returns the elements of the dotted type name.
 // The package name is not part of this name.
 func (e *ExtensionDescriptor) TypeName() (s []string) {
 	name := e.GetName()
-	if e.parent == nil {
+	if e.message == nil {
 		// top-level extension
 		s = make([]string, 1)
 	} else {
-		pname := e.parent.TypeName()
+		pname := e.message.TypeName()
 		s = make([]string, len(pname)+1)
 		copy(s, pname)
 	}

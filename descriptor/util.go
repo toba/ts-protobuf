@@ -1,11 +1,11 @@
-package main
+package descriptor
 
 import (
 	"strconv"
 	"strings"
 	"unicode"
 
-	"github.com/golang/protobuf/protoc-gen-go/descriptor"
+	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 var escapeChars = [256]byte{
@@ -20,40 +20,40 @@ func CamelCaseSlice(elem []string) string { return CamelCase(strings.Join(elem, 
 func dottedSlice(elem []string) string { return strings.Join(elem, ".") }
 
 // Is this field optional?
-func isOptional(field *descriptor.FieldDescriptorProto) bool {
-	return field.Label != nil && *field.Label == descriptor.FieldDescriptorProto_LABEL_OPTIONAL
+func isOptional(field *proto.FieldDescriptorProto) bool {
+	return field.Label != nil && *field.Label == proto.FieldDescriptorProto_LABEL_OPTIONAL
 }
 
 // Is this field required?
-func isRequired(field *descriptor.FieldDescriptorProto) bool {
-	return field.Label != nil && *field.Label == descriptor.FieldDescriptorProto_LABEL_REQUIRED
+func isRequired(field *proto.FieldDescriptorProto) bool {
+	return field.Label != nil && *field.Label == proto.FieldDescriptorProto_LABEL_REQUIRED
 }
 
 // Is this field repeated?
-func isRepeated(field *descriptor.FieldDescriptorProto) bool {
-	return field.Label != nil && *field.Label == descriptor.FieldDescriptorProto_LABEL_REPEATED
+func isRepeated(field *proto.FieldDescriptorProto) bool {
+	return field.Label != nil && *field.Label == proto.FieldDescriptorProto_LABEL_REPEATED
 }
 
 // Is this field a scalar numeric type?
-func isScalar(field *descriptor.FieldDescriptorProto) bool {
+func isScalar(field *proto.FieldDescriptorProto) bool {
 	if field.Type == nil {
 		return false
 	}
 	switch *field.Type {
-	case descriptor.FieldDescriptorProto_TYPE_DOUBLE,
-		descriptor.FieldDescriptorProto_TYPE_FLOAT,
-		descriptor.FieldDescriptorProto_TYPE_INT64,
-		descriptor.FieldDescriptorProto_TYPE_UINT64,
-		descriptor.FieldDescriptorProto_TYPE_INT32,
-		descriptor.FieldDescriptorProto_TYPE_FIXED64,
-		descriptor.FieldDescriptorProto_TYPE_FIXED32,
-		descriptor.FieldDescriptorProto_TYPE_BOOL,
-		descriptor.FieldDescriptorProto_TYPE_UINT32,
-		descriptor.FieldDescriptorProto_TYPE_ENUM,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED32,
-		descriptor.FieldDescriptorProto_TYPE_SFIXED64,
-		descriptor.FieldDescriptorProto_TYPE_SINT32,
-		descriptor.FieldDescriptorProto_TYPE_SINT64:
+	case proto.FieldDescriptorProto_TYPE_DOUBLE,
+		proto.FieldDescriptorProto_TYPE_FLOAT,
+		proto.FieldDescriptorProto_TYPE_INT64,
+		proto.FieldDescriptorProto_TYPE_UINT64,
+		proto.FieldDescriptorProto_TYPE_INT32,
+		proto.FieldDescriptorProto_TYPE_FIXED64,
+		proto.FieldDescriptorProto_TYPE_FIXED32,
+		proto.FieldDescriptorProto_TYPE_BOOL,
+		proto.FieldDescriptorProto_TYPE_UINT32,
+		proto.FieldDescriptorProto_TYPE_ENUM,
+		proto.FieldDescriptorProto_TYPE_SFIXED32,
+		proto.FieldDescriptorProto_TYPE_SFIXED64,
+		proto.FieldDescriptorProto_TYPE_SINT32,
+		proto.FieldDescriptorProto_TYPE_SINT64:
 		return true
 	default:
 		return false

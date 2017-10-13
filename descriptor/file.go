@@ -2,11 +2,11 @@ package descriptor
 
 import (
 	"fmt"
+	"log"
 	"path"
 	"strings"
 
 	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
-	"github.com/toba/ts-protobuf/symbol"
 )
 
 // FileDescriptor describes a protocol buffer descriptor file (.proto). It
@@ -14,17 +14,17 @@ import (
 // are constructed by WrapTypes.
 type FileDescriptor struct {
 	*proto.FileDescriptorProto
-	desc []*Descriptor          // All the messages defined in this file.
-	enum []*EnumDescriptor      // All the enums defined in this file.
-	ext  []*ExtensionDescriptor // All the top-level extensions defined in this file.
-	imp  []*ImportedDescriptor  // All types defined in files publicly imported by this file.
+	messages   []*MessageDescriptor   // All the messages defined in this file.
+	enums      []*EnumDescriptor      // All the enums defined in this file.
+	extensions []*ExtensionDescriptor // All the top-level extensions defined in this file.
+	imports    []*ImportedDescriptor  // All types defined in files publicly imported by this file.
 
-	// Comments, stored as a map of path (comma-separated integers) to the comment.
+	// Comments stored as a map of path (comma-separated integers) to the comment.
 	comments map[string]*proto.SourceCodeInfo_Location
 
 	// The full list of symbols that are exported, as a map from the exported
 	// object to its symbols. This is used for supporting public imports.
-	exported map[Object][]symbol.Symbol
+	//exports map[ProtoObject][]symbol.Symbol
 
 	index  int  // The index of this file in the list of files to generate code for
 	proto3 bool // whether to generate proto3 code for this file
@@ -87,26 +87,32 @@ func (d *FileDescriptor) goPackageName() (name string, explicit bool) {
 	return baseName(d.GetName()), false
 }
 
-// goFileName returns the output name for the generated Go file.
-func (d *FileDescriptor) goFileName() string {
+// outputFileName returns the output name for the generated TypeScript file.
+func (d *FileDescriptor) outputFileName() string {
 	name := *d.Name
 	if ext := path.Ext(name); ext == ".proto" || ext == ".protodevel" {
 		name = name[:len(name)-len(ext)]
 	}
-	name += ".pb.go"
-
-	// Does the file have a "go_package" option?
-	// If it does, it may override the filename.
-	if impPath, _, ok := d.goPackageOption(); ok && impPath != "" {
-		// Replace the existing dirname with the declared import path.
-		_, name = path.Split(name)
-		name = path.Join(impPath, name)
-		return name
-	}
-
-	return name
+	return name + ".pb.ts"
 }
 
-func (d *FileDescriptor) addExport(obj Object, sym symbol) {
-	d.exported[obj] = append(d.exported[obj], sym)
+// TODO: fix circular dep
+// func (d *FileDescriptor) addExport(obj ProtoObject, sym symbol) {
+// 	d.exports[obj] = append(d.exports[obj], sym)
+// }
+
+func fileIsProto3(file *proto.FileDescriptorProto) bool {
+	return file.GetSyntax() == "proto3"
+}
+
+// Each package name we generate must be unique. The package we're generating
+// gets its own name but every other package must have a unique name that does
+// not conflict in the code we generate.  These names are chosen globally (although
+// they don't have to be, it simplifies things to do them globally).
+func uniquePackageOf(fd *proto.FileDescriptorProto) string {
+	s, ok := uniquePackageName[fd]
+	if !ok {
+		log.Fatal("internal error: no package name defined for " + fd.GetName())
+	}
+	return s
 }

@@ -4,27 +4,25 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/gogo/protobuf/protoc-gen-gogo/descriptor"
 	proto "github.com/golang/protobuf/protoc-gen-go/descriptor"
 )
 
 // Descriptor represents a protocol buffer message.
-type Descriptor struct {
+type MessageDescriptor struct {
 	common
 	*proto.DescriptorProto
-	parent   *Descriptor            // The containing message, if any.
-	nested   []*Descriptor          // Inner messages, if any.
-	enums    []*EnumDescriptor      // Inner enums, if any.
-	ext      []*ExtensionDescriptor // Extensions, if any.
-	typename []string               // Cached typename vector.
-	index    int                    // The index into the container, whether the file or another message.
-	path     string                 // The SourceCodeInfo path as comma-separated integers.
-	group    bool
+	parent     *MessageDescriptor     // The containing message, if any.
+	nested     []*MessageDescriptor   // Inner messages, if any.
+	enums      []*EnumDescriptor      // Inner enums, if any.
+	extensions []*ExtensionDescriptor // Extensions, if any.
+	typename   []string               // Cached typename vector.
+	index      int                    // The index into the container, whether the file or another message.
+	path       string                 // The SourceCodeInfo path as comma-separated integers.
+	group      bool
 }
 
-// Construct the Descriptor
-func newDescriptor(desc *proto.DescriptorProto, parent *Descriptor, file *proto.FileDescriptorProto, index int) *Descriptor {
-	d := &Descriptor{
+func newMessage(desc *proto.DescriptorProto, parent *MessageDescriptor, file *proto.FileDescriptorProto, index int) *MessageDescriptor {
+	d := &MessageDescriptor{
 		common:          common{file},
 		DescriptorProto: desc,
 		parent:          parent,
@@ -45,7 +43,7 @@ func newDescriptor(desc *proto.DescriptorProto, parent *Descriptor, file *proto.
 		}
 		exp := "." + strings.Join(parts, ".")
 		for _, field := range parent.Field {
-			if field.GetType() == descriptor.FieldDescriptorProto_TYPE_GROUP && field.GetTypeName() == exp {
+			if field.GetType() == proto.FieldDescriptorProto_TYPE_GROUP && field.GetTypeName() == exp {
 				d.group = true
 				break
 			}
@@ -53,15 +51,15 @@ func newDescriptor(desc *proto.DescriptorProto, parent *Descriptor, file *proto.
 	}
 
 	for _, field := range desc.Extension {
-		d.ext = append(d.ext, &ExtensionDescriptor{common{file}, field, d})
+		d.extensions = append(d.extensions, &ExtensionDescriptor{common{file}, field, d})
 	}
 
 	return d
 }
 
 // Return a slice of all the Descriptors defined within this file
-func wrapDescriptors(file *proto.FileDescriptorProto) []*Descriptor {
-	sl := make([]*Descriptor, 0, len(file.MessageType)+10)
+func wrapMessages(file *proto.FileDescriptorProto) []*MessageDescriptor {
+	sl := make([]*MessageDescriptor, 0, len(file.MessageType)+10)
 	for i, desc := range file.MessageType {
 		sl = wrapThisDescriptor(sl, desc, nil, file, i)
 	}
@@ -69,8 +67,8 @@ func wrapDescriptors(file *proto.FileDescriptorProto) []*Descriptor {
 }
 
 // Wrap this Descriptor, recursively
-func wrapThisDescriptor(sl []*Descriptor, desc *proto.DescriptorProto, parent *Descriptor, file *proto.FileDescriptorProto, index int) []*Descriptor {
-	sl = append(sl, newDescriptor(desc, parent, file, index))
+func wrapThisDescriptor(sl []*MessageDescriptor, desc *proto.DescriptorProto, parent *MessageDescriptor, file *proto.FileDescriptorProto, index int) []*MessageDescriptor {
+	sl = append(sl, newMessage(desc, parent, file, index))
 	me := sl[len(sl)-1]
 	for i, nested := range desc.NestedType {
 		sl = wrapThisDescriptor(sl, nested, me, file, i)
@@ -80,7 +78,7 @@ func wrapThisDescriptor(sl []*Descriptor, desc *proto.DescriptorProto, parent *D
 
 // TypeName returns the elements of the dotted type name. The package name is
 // not part of this name.
-func (d *Descriptor) TypeName() []string {
+func (d *MessageDescriptor) TypeName() []string {
 	if d.typename != nil {
 		return d.typename
 	}

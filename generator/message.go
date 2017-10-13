@@ -11,12 +11,26 @@ import (
 	"github.com/toba/ts-protobuf/descriptor"
 )
 
+// Method names that may be generated. Fields with these names get an
+// underscore appended. Any change to this set is a potential incompatible
+// API change because it changes generated field names.
+var methodNames = [...]string{
+	"Reset",
+	"String",
+	"ProtoMessage",
+	"Marshal",
+	"Unmarshal",
+	"ExtensionRangeArray",
+	"ExtensionMap",
+	"Descriptor",
+}
+
 // Generate the type and default constant definitions for this Descriptor.
-func (g *Generator) generateMessage(message *descriptor.Descriptor) {
+func (g *Generator) generateMessage(message *descriptor.MessageDescriptor) {
 	// The full type name
 	typeName := message.TypeName()
 	// The full type name, CamelCased.
-	ccTypeName := CamelCaseSlice(typeName)
+	ccTypeName := descriptor.CamelCaseSlice(typeName)
 
 	usedNames := make(map[string]bool)
 	for _, n := range methodNames {
@@ -792,4 +806,20 @@ func (g *Generator) generateMessage(message *descriptor.Descriptor) {
 	}
 
 	g.addInitf("%s.RegisterType((*%s)(nil), %q)", g.Pkg["proto"], ccTypeName, fullName)
+}
+
+// Scan the messages in this file.  For each one, build the slice of nested descriptors
+func (g *Generator) buildNestedMessages(descs []*descriptor.MessageDescriptor) {
+	for _, desc := range descs {
+		if len(desc.NestedType) != 0 {
+			for _, nest := range descs {
+				if nest.parent == desc {
+					desc.nested = append(desc.nested, nest)
+				}
+			}
+			if len(desc.nested) != len(desc.NestedType) {
+				g.Fail("internal error: nesting failure for", desc.GetName())
+			}
+		}
+	}
 }

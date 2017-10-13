@@ -95,3 +95,31 @@ func (g *Generator) generateEnum(enum *descriptor.EnumDescriptor) {
 
 	g.P()
 }
+
+func (g *Generator) generateEnumRegistration(enum *descriptor.EnumDescriptor) {
+	// // We always print the full (proto-world) package name here.
+	pkg := enum.File().GetPackage()
+	if pkg != "" {
+		pkg += "."
+	}
+	// The full type name
+	typeName := enum.TypeName()
+	// The full type name, CamelCased.
+	ccTypeName := CamelCaseSlice(typeName)
+	g.addInitf("%s.RegisterEnum(%q, %[3]s_name, %[3]s_value)", g.Pkg["proto"], pkg+ccTypeName, ccTypeName)
+}
+
+func (g *Generator) buildNestedEnums(descs []*descriptor.MessageDescriptor, enums []*descriptor.EnumDescriptor) {
+	for _, desc := range descs {
+		if len(desc.EnumType) != 0 {
+			for _, enum := range enums {
+				if enum.parent == desc {
+					desc.enums = append(desc.enums, enum)
+				}
+			}
+			if len(desc.enums) != len(desc.EnumType) {
+				g.Fail("internal error: enum nesting failure for", desc.GetName())
+			}
+		}
+	}
+}

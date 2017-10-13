@@ -4,7 +4,7 @@ package descriptor
 // another file.
 type ImportedDescriptor struct {
 	common
-	o Object
+	o ProtoObject
 }
 
 func (id *ImportedDescriptor) TypeName() []string {

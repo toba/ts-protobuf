@@ -128,3 +128,43 @@ func (g *Generator) RecordTypeUse(t string) {
 		g.usedPackages[obj.PackageName()] = true
 	}
 }
+
+// WrapTypes walks the incoming data, wrapping DescriptorProtos, EnumDescriptorProtos
+// and FileDescriptorProtos into file-referenced objects within the Generator.
+// It also creates the list of files to generate and so should be called before GenerateAllFiles.
+func (g *Generator) WrapTypes() {
+	g.allFiles = make([]*descriptor.FileDescriptor, 0, len(g.Request.ProtoFile))
+	g.allFilesByName = make(map[string]*descriptor.FileDescriptor, len(g.allFiles))
+	for _, f := range g.Request.ProtoFile {
+		// We must wrap the descriptors before we wrap the enums
+		descs := wrapMessages(f)
+		g.buildNestedDescriptors(descs)
+		enums := wrapEnumDescriptors(f, descs)
+		g.buildNestedEnums(descs, enums)
+		exts := wrapExtensions(f)
+		fd := &FileDescriptor{
+			FileDescriptorProto: f,
+			desc:                descs,
+			enum:                enums,
+			ext:                 exts,
+			exported:            make(map[Object][]symbol),
+			proto3:              fileIsProto3(f),
+		}
+		extractComments(fd)
+		g.allFiles = append(g.allFiles, fd)
+		g.allFilesByName[f.GetName()] = fd
+	}
+	for _, fd := range g.allFiles {
+		fd.imp = wrapImported(fd.FileDescriptorProto, g)
+	}
+
+	g.genFiles = make([]*FileDescriptor, 0, len(g.Request.FileToGenerate))
+	for _, fileName := range g.Request.FileToGenerate {
+		fd := g.allFilesByName[fileName]
+		if fd == nil {
+			g.Fail("could not find file named", fileName)
+		}
+		fd.index = len(g.genFiles)
+		g.genFiles = append(g.genFiles, fd)
+	}
+}

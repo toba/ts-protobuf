@@ -3,6 +3,8 @@ package generator
 import (
 	"path"
 	"strconv"
+
+	"github.com/toba/ts-protobuf/descriptor"
 )
 
 // Generate the imports
@@ -72,4 +74,24 @@ func (g *Generator) generateImported(id *ImportedDescriptor) {
 	}
 
 	g.P()
+}
+
+// Return a slice of all the types that are publicly imported into this file.
+func wrapImported(file *descriptor.FileDescriptorProto, g *Generator) (sl []*ImportedDescriptor) {
+	for _, index := range file.PublicDependency {
+		df := g.fileByName(file.Dependency[index])
+		for _, d := range df.desc {
+			if d.GetOptions().GetMapEntry() {
+				continue
+			}
+			sl = append(sl, &ImportedDescriptor{common{file}, d})
+		}
+		for _, e := range df.enum {
+			sl = append(sl, &ImportedDescriptor{common{file}, e})
+		}
+		for _, ext := range df.ext {
+			sl = append(sl, &ImportedDescriptor{common{file}, ext})
+		}
+	}
+	return
 }
